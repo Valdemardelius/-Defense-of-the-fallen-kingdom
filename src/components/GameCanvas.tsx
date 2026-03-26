@@ -36,33 +36,30 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     });
     engineRef.current = engine;
 
-    // Добавляем тестовых юнитов вокруг базы
     engine.addUnit('melee', width / 2 - 80, height / 2);
     engine.addUnit('ranged', width / 2 + 80, height / 2);
     engine.addUnit('tank', width / 2, height / 2 - 80);
     
-    // Функция для спавна тестовых врагов
     let enemyCount = 0;
     const spawnInterval = setInterval(() => {
       if (engineRef.current) {
-        // Спавним врага с случайной позиции по краям
         const side = Math.floor(Math.random() * 4);
         let x: number, y: number;
         
         switch(side) {
-          case 0: // верх
+          case 0:
             x = Math.random() * width;
             y = 20;
             break;
-          case 1: // право
+          case 1:
             x = width - 20;
             y = Math.random() * height;
             break;
-          case 2: // низ
+          case 2:
             x = Math.random() * width;
             y = height - 20;
             break;
-          default: // лево
+          default:
             x = 20;
             y = Math.random() * height;
         }
@@ -79,9 +76,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           isBoss: false
         });
       }
-    }, 3000); // Каждые 3 секунды новый враг
+    }, 3000);
 
-    // Анимационный цикл
+    
     let lastTime = performance.now();
     
     const animate = (currentTime: number) => {
@@ -113,7 +110,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         className="rounded-lg shadow-2xl border-2 border-white/20"
         style={{ touchAction: 'none' }}
       />
-      {/* Отображение ресурсов поверх canvas для теста */}
       <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1 rounded-lg">
         💰 {resources}
       </div>
