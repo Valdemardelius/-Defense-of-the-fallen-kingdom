@@ -1,4 +1,3 @@
-// Правильный импорт - разделяем типы и значения
 import type { IUnit, IEnemy, UnitType } from '../types';
 
 export class GameEngine {
@@ -13,7 +12,6 @@ export class GameEngine {
   public baseHp: number = 1000;
   public baseMaxHp: number = 1000;
   
-  // Колбэки для уведомления React
   private onBaseDamage?: (damage: number) => void;
   private onEnemyKilled?: (reward: number) => void;
   
