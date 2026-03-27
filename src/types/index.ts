@@ -1,7 +1,5 @@
-// Тип юнита
 export type UnitType = 'melee' | 'ranged' | 'tank';
 
-// Интерфейс юнита
 export interface IUnit {
   id: string;
   x: number;
@@ -15,7 +13,6 @@ export interface IUnit {
   lastAttack: number;
 }
 
-// Интерфейс врага
 export interface IEnemy {
   id: string;
   x: number;
