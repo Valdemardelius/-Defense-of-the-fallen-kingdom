@@ -23,4 +23,9 @@ export interface IEnemy {
   reward: number;
   speed: number;
   isBoss: boolean;
+  isTank?: boolean;
+  attackRange?: number;      
+  attackCooldown?: number;   
+  lastAttackTime?: number;   
+  targetUnitId?: string;     
 }

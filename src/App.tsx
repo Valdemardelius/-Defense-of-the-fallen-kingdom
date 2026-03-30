@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { InfoPanel } from './components/UI/InfoPanel';
 import { BuildMenu } from './components/UI/BuildMenu';
+import { TechTree } from './components/UI/TechTree';
 import { useGameStore } from './store/gameStore';
 
 function App() {
-  const { spendResources, addResources, damageBase, baseHp } = useGameStore();
+  const { baseHp } = useGameStore();
+  const [unitCount, setUnitCount] = useState(0);
+  const canvasRef = useRef<any>(null);
+
+  const handleUnitCountChange = (count: number) => {
+    setUnitCount(count);
+  };
 
   const handleBuyUnit = (type: 'melee' | 'ranged' | 'tank') => {
+    if (canvasRef.current?.buyUnit) {
+      canvasRef.current.buyUnit(type);
+    }
   };
 
   if (baseHp <= 0) {
@@ -31,17 +41,25 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-game-dark to-game-light flex flex-col items-center justify-center p-2">
       <InfoPanel />
+      <TechTree />
       
       <div className="mt-16 mb-32">
-        <GameCanvas width={800} height={600} />
+        <GameCanvas 
+          ref={canvasRef}
+          width={800} 
+          height={600}
+          onUnitCountChange={handleUnitCountChange}
+        />
       </div>
       
-      <BuildMenu onBuyUnit={(type) => {
-        console.log('Покупка юнита:', type);
-      }} />
+      <BuildMenu 
+        onBuyUnit={handleBuyUnit}
+        currentUnitCount={unitCount}
+        maxUnits={20}
+      />
       
       <div className="fixed bottom-2 left-0 right-0 text-center text-gray-500 text-xs">
-        🎮 Враги идут волнами | Убивай мобов для ресурсов | Покупай юнитов для защиты
+        🎮 Танки (золотая обводка) в приоритете у врагов | Максимум 20 юнитов
       </div>
     </div>
   );

@@ -1,22 +1,42 @@
 import { create } from 'zustand';
 
+interface Upgrade {
+  level: number;
+  cost: number;
+  effect: number;
+}
+
 interface GameState {
   resources: number;
   baseHp: number;
   wave: number;
+  unitDamageUpgrade: Upgrade;
+  unitHpUpgrade: Upgrade;
+  resourceGainUpgrade: Upgrade;
   addResources: (amount: number) => void;
   spendResources: (amount: number) => boolean;
   damageBase: (damage: number) => void;
-  nextWave: () => void;
+  setWave: (wave: number) => void;
+  upgradeUnitDamage: () => boolean;
+  upgradeUnitHp: () => boolean;
+  upgradeResourceGain: () => boolean;
+  getUnitDamageBonus: () => number;
+  getUnitHpBonus: () => number;
+  getResourceGainBonus: () => number;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
   resources: 200,
   baseHp: 1000,
-  wave: 0,
+  wave: 1,
+  
+  unitDamageUpgrade: { level: 0, cost: 100, effect: 1.0 },
+  unitHpUpgrade: { level: 0, cost: 80, effect: 1.0 },
+  resourceGainUpgrade: { level: 0, cost: 120, effect: 1.0 },
   
   addResources: (amount: number) => {
-    set((state) => ({ resources: state.resources + amount }));
+    const bonus = get().getResourceGainBonus();
+    set((state) => ({ resources: state.resources + Math.floor(amount * bonus) }));
   },
   
   spendResources: (amount: number) => {
@@ -32,7 +52,70 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => ({ baseHp: Math.max(0, state.baseHp - damage) }));
   },
   
-  nextWave: () => {
-    set((state) => ({ wave: state.wave + 1 }));
+  setWave: (wave: number) => {
+    set({ wave });
+  },
+  
+  upgradeUnitDamage: () => {
+    const { unitDamageUpgrade, resources, spendResources } = get();
+    if (resources >= unitDamageUpgrade.cost) {
+      if (spendResources(unitDamageUpgrade.cost)) {
+        set({
+          unitDamageUpgrade: {
+            level: unitDamageUpgrade.level + 1,
+            cost: Math.floor(unitDamageUpgrade.cost * 1.6),
+            effect: unitDamageUpgrade.effect + 0.2
+          }
+        });
+        return true;
+      }
+    }
+    return false;
+  },
+  
+  upgradeUnitHp: () => {
+    const { unitHpUpgrade, resources, spendResources } = get();
+    if (resources >= unitHpUpgrade.cost) {
+      if (spendResources(unitHpUpgrade.cost)) {
+        set({
+          unitHpUpgrade: {
+            level: unitHpUpgrade.level + 1,
+            cost: Math.floor(unitHpUpgrade.cost * 1.5),
+            effect: unitHpUpgrade.effect + 0.15
+          }
+        });
+        return true;
+      }
+    }
+    return false;
+  },
+  
+  upgradeResourceGain: () => {
+    const { resourceGainUpgrade, resources, spendResources } = get();
+    if (resources >= resourceGainUpgrade.cost) {
+      if (spendResources(resourceGainUpgrade.cost)) {
+        set({
+          resourceGainUpgrade: {
+            level: resourceGainUpgrade.level + 1,
+            cost: Math.floor(resourceGainUpgrade.cost * 1.7),
+            effect: resourceGainUpgrade.effect + 0.25
+          }
+        });
+        return true;
+      }
+    }
+    return false;
+  },
+  
+  getUnitDamageBonus: () => {
+    return get().unitDamageUpgrade.effect;
+  },
+  
+  getUnitHpBonus: () => {
+    return get().unitHpUpgrade.effect;
+  },
+  
+  getResourceGainBonus: () => {
+    return get().resourceGainUpgrade.effect;
   }
 }));
