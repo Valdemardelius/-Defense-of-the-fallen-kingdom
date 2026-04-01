@@ -1,4 +1,6 @@
-export type UnitType = 'melee' | 'ranged' | 'tank';
+import type { UnitType } from '../config/units';
+
+export type { UnitType };
 
 export interface IUnit {
   id: string;
@@ -11,6 +13,8 @@ export interface IUnit {
   attackRange: number;
   attackCooldown: number;
   lastAttack: number;
+  hexQ?: number;
+  hexR?: number;
 }
 
 export interface IEnemy {
@@ -24,8 +28,8 @@ export interface IEnemy {
   speed: number;
   isBoss: boolean;
   isTank?: boolean;
-  attackRange?: number;      
-  attackCooldown?: number;   
-  lastAttackTime?: number;   
-  targetUnitId?: string;     
+  attackRange?: number;
+  attackCooldown?: number;
+  lastAttackTime?: number;
+  targetUnitId?: string;
 }

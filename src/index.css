@@ -1,31 +1,10 @@
-export type UnitType = 'melee' | 'ranged' | 'tank';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-export interface IUnit {
-  id: string;
-  x: number;
-  y: number;
-  type: UnitType;
-  hp: number;
-  maxHp: number;
-  damage: number;
-  attackRange: number;
-  attackCooldown: number;
-  lastAttack: number;
-}
-
-export interface IEnemy {
-  id: string;
-  x: number;
-  y: number;
-  hp: number;
-  maxHp: number;
-  damage: number;
-  reward: number;
-  speed: number;
-  isBoss: boolean;
-  isTank?: boolean;
-  attackRange?: number;      // Радиус атаки врага
-  attackCooldown?: number;   // Кулдаун атаки врага
-  lastAttackTime?: number;   // Время последней атаки
-  targetUnitId?: string;     // ID цели (юнита)
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a472a;
 }

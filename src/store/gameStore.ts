@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { type UnitType } from '../config/units';
 
 interface Upgrade {
   level: number;
@@ -10,6 +11,7 @@ interface GameState {
   resources: number;
   baseHp: number;
   wave: number;
+  unitCounts: Record<UnitType, number>;
   unitDamageUpgrade: Upgrade;
   unitHpUpgrade: Upgrade;
   resourceGainUpgrade: Upgrade;
@@ -17,6 +19,7 @@ interface GameState {
   spendResources: (amount: number) => boolean;
   damageBase: (damage: number) => void;
   setWave: (wave: number) => void;
+  setUnitCounts: (counts: Record<UnitType, number>) => void;
   upgradeUnitDamage: () => boolean;
   upgradeUnitHp: () => boolean;
   upgradeResourceGain: () => boolean;
@@ -29,6 +32,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   resources: 200,
   baseHp: 1000,
   wave: 1,
+  unitCounts: { melee: 0, ranged: 0, tank: 0 },
   
   unitDamageUpgrade: { level: 0, cost: 100, effect: 1.0 },
   unitHpUpgrade: { level: 0, cost: 80, effect: 1.0 },
@@ -54,6 +58,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   setWave: (wave: number) => {
     set({ wave });
+  },
+  
+  setUnitCounts: (counts: Record<UnitType, number>) => {
+    set({ unitCounts: counts });
   },
   
   upgradeUnitDamage: () => {

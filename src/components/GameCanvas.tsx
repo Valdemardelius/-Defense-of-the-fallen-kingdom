@@ -1,11 +1,14 @@
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { GameEngine } from '../engine/GameEngine';
+import React, { useRef, forwardRef, useImperativeHandle, useCallback, useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { TOTAL_MAX_UNITS, type UnitType } from '../config/units';
+import { useGameLoop } from './hooks/useGameLoop';
+import { useWaveSystem } from './hooks/useWaveSystem';
+import { useUnitManager } from './hooks/useUnitManager';
 
 interface GameCanvasProps {
   width?: number;
   height?: number;
-  onUnitCountChange?: (count: number) => void;
+  onUnitCountChange?: (count: number, countsByType: Record<UnitType, number>) => void;
 }
 
 export const GameCanvas = forwardRef<any, GameCanvasProps>(({ 
@@ -13,235 +16,125 @@ export const GameCanvas = forwardRef<any, GameCanvasProps>(({
   height = 600,
   onUnitCountChange 
 }, ref) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<GameEngine | null>(null);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [selectedUnitType, setSelectedUnitType] = useState<UnitType | null>(null);
+  const [hoverHex, setHoverHex] = useState<{ q: number; r: number; x: number; y: number } | null>(null);
+  const { addResources, damageBase, setWave } = useGameStore();
   
-  const { addResources, damageBase, nextWave } = useGameStore();
-  const [enemiesKilled, setEnemiesKilled] = useState(0);
-
+  const canvasRefCallback = useCallback((node: HTMLCanvasElement | null) => {
+    if (node) setCanvas(node);
+  }, []);
+  
+  const { engine } = useGameLoop({
+    canvas,
+    width,
+    height,
+    onBaseDamage: damageBase,
+    onEnemyKilled: addResources,
+    onUnitCountChange
+  });
+  
+  useWaveSystem({
+    engine,
+    width,
+    height,
+    onWaveStart: setWave
+  });
+  
+  const { buyUnitAuto, buyUnitAtPosition } = useUnitManager(engine, onUnitCountChange);
+  
   useImperativeHandle(ref, () => ({
-    buyUnit: (type: 'melee' | 'ranged' | 'tank') => {
-      handleBuyUnit(type);
+    buyUnit: (type: UnitType, x?: number, y?: number) => {
+      if (x !== undefined && y !== undefined) {
+        buyUnitAtPosition(type, x, y);
+      } else {
+        buyUnitAuto(type);
+      }
+    },
+    setSelectedUnitType: (type: UnitType | null) => {
+      setSelectedUnitType(type);
     }
   }));
-
-  const handleBuyUnit = (type: 'melee' | 'ranged' | 'tank') => {
-  if (!engineRef.current) return;
   
-  const costs = { melee: 80, ranged: 100, tank: 120 };
-  const currentUnitCount = engineRef.current.units.length;
-  
-  if (currentUnitCount >= 20) {
-    alert('⚠️ Достигнут лимит юнитов (20)!');
-    return;
-  }
-  
-  const { spendResources, getUnitDamageBonus, getUnitHpBonus } = useGameStore.getState();
-  
-  if (useGameStore.getState().resources < costs[type]) {
-    alert(`❌ Недостаточно ресурсов! Нужно ${costs[type]}💰`);
-    return;
-  }
-  
-  if (spendResources(costs[type])) {
-    const damageBonus = getUnitDamageBonus();
-    const hpBonus = getUnitHpBonus();
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!selectedUnitType || !engine) return;
     
-    const result = engineRef.current.addUnit(type, undefined, undefined, damageBonus, hpBonus);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scaleX = e.currentTarget.width / rect.width;
+    const scaleY = e.currentTarget.height / rect.height;
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
     
-    if (!result.success) {
-      spendResources(-costs[type]);
-      
-      if (result.reason === 'max_units') {
-        alert('⚠️ Достигнут лимит юнитов (20)!');
-      } else if (result.reason === 'no_space') {
-        alert('⚠️ Нет свободного места вокруг базы!');
-      } else if (result.reason === 'position_occupied') {
-        alert('⚠️ Место занято, попробуйте позже');
-      }
-    } else {
-      if (onUnitCountChange) {
-        onUnitCountChange(engineRef.current.units.length);
-      }
-    }
-  }
-};
-
-useEffect(() => {
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-
-  const engine = new GameEngine(canvas, width, height, {
-    onBaseDamage: (damage) => {
-      damageBase(damage);
-    },
-    onEnemyKilled: (reward) => {
-      addResources(reward);
-      setEnemiesKilled(prev => prev + 1);
-    }
-  });
-  engineRef.current = engine;
-
-  engine.addUnit('melee');
-  engine.addUnit('ranged');
-  
-  if (onUnitCountChange) {
-    onUnitCountChange(engine.units.length);
-  }
-
-  let waveCount = 1;
-  let enemiesInWave = 5;
-  let enemiesSpawned = 0;
-  let isWaveActive = true;
-  let spawnInterval: NodeJS.Timeout | null = null;
-  let checkInterval: NodeJS.Timeout | null = null;
-  
-  const { setWave } = useGameStore.getState();
-  setWave(1);
-  
-  const spawnEnemy = () => {
-    if (!engineRef.current) return;
-    if (enemiesSpawned >= enemiesInWave) return;
-    
-    const side = Math.floor(Math.random() * 4);
-    let x: number, y: number;
-    
-    switch(side) {
-      case 0: x = 20 + Math.random() * 100; y = 20; break;
-      case 1: x = width - 20; y = 20 + Math.random() * (height - 40); break;
-      case 2: x = 20 + Math.random() * (width - 40); y = height - 20; break;
-      default: x = 20; y = 20 + Math.random() * (height - 40);
-    }
-    
-    let hp = 30 + waveCount * 3;
-    let damage = 8 + Math.floor(waveCount / 3);
-    let reward = 15 + waveCount;
-    let speed = 40 + waveCount / 5;
-    let isTank = false;
-    
-    if (waveCount > 2 && waveCount % 3 === 0 && Math.random() < 0.3) {
-      isTank = true;
-      hp = hp * 2.5;
-      damage = damage * 0.5;
-      reward = reward * 1.5;
-      speed = speed * 0.6;
-    }
-    
-    const isBoss = waveCount % 10 === 0 && enemiesSpawned === 0;
-    
-    engineRef.current.addEnemy({
-      id: `enemy_${Date.now()}_${enemiesSpawned}`,
-      x, y,
-      hp: hp,
-      maxHp: hp,
-      damage: damage,
-      reward: reward,
-      speed: speed,
-      isBoss: isBoss,
-      isTank: isTank,
-      attackRange: 45,
-      attackCooldown: 1.0,
-      lastAttackTime: 0
-    });
-    
-    enemiesSpawned++;
-  };
-  
-  spawnInterval = setInterval(() => {
-    if (!engineRef.current) return;
-    if (enemiesSpawned >= enemiesInWave) {
-      if (spawnInterval) clearInterval(spawnInterval);
-      spawnInterval = null;
+    const hexAtPos = engine.getHexAtPixel(mouseX, mouseY);
+    if (!hexAtPos) {
+      alert('⚠️ Выберите свободный гекс!');
       return;
     }
-    spawnEnemy();
-  }, 1500);
-  
-  checkInterval = setInterval(() => {
-    if (!engineRef.current) return;
     
-    if (isWaveActive && 
-        enemiesSpawned >= enemiesInWave && 
-        engineRef.current.enemies.length === 0) {
-      isWaveActive = false;
-      
-      waveCount++;
-      enemiesInWave = 5 + Math.floor(waveCount / 3);
-      enemiesSpawned = 0;
-      isWaveActive = true;
-      
-      setWave(waveCount);
-      
-      if (spawnInterval) clearInterval(spawnInterval);
-      spawnInterval = setInterval(() => {
-        if (!engineRef.current) return;
-        if (enemiesSpawned >= enemiesInWave) {
-          if (spawnInterval) clearInterval(spawnInterval);
-          spawnInterval = null;
-          return;
-        }
-        spawnEnemy();
-      }, 1500);
-    }
-  }, 500);
-  
-  let lastTime = performance.now();
-  
-  const animate = (currentTime: number) => {
-    const deltaTime = (currentTime - lastTime) / 1000;
-    lastTime = currentTime;
-    
-    if (engineRef.current) {
-      engineRef.current.update(deltaTime);
-      engineRef.current.draw();
-      
-      if (onUnitCountChange && engineRef.current.units.length !== unitCountRef.current) {
-        unitCountRef.current = engineRef.current.units.length;
-        onUnitCountChange(unitCountRef.current);
-      }
-    }
-    
-    requestAnimationFrame(animate);
+    buyUnitAtPosition(selectedUnitType, mouseX, mouseY);
+    setSelectedUnitType(null);
   };
   
-  const animationId = requestAnimationFrame(animate);
-  
-  return () => {
-    if (spawnInterval) clearInterval(spawnInterval);
-    if (checkInterval) clearInterval(checkInterval);
-    cancelAnimationFrame(animationId);
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!engine) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scaleX = e.currentTarget.width / rect.width;
+    const scaleY = e.currentTarget.height / rect.height;
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+    
+    const hexAtPos = engine.getHexAtPixel(mouseX, mouseY);
+    setHoverHex(hexAtPos);
   };
-}, [width, height]);
 
-  const unitCountRef = useRef(0);
+  const handleCanvasMouseLeave = () => {
+    setHoverHex(null);
+  };
+  
+  useEffect(() => {
+    if (!engine || !hoverHex || !selectedUnitType) return;
+    
+    let frameId: number;
+    
+    const drawHighlight = () => {
+      if (engine && hoverHex) {
+        engine.drawHighlight(hoverHex.q, hoverHex.r);
+      }
+      frameId = requestAnimationFrame(drawHighlight);
+    };
+    
+    frameId = requestAnimationFrame(drawHighlight);
+    return () => cancelAnimationFrame(frameId);
+  }, [engine, hoverHex, selectedUnitType]);
 
   return (
-  <div className="relative">
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className="rounded-lg shadow-2xl border-2 border-white/20"
-      style={{ touchAction: 'none' }}
-    />
-    
-    {/* УДАЛИ ЭТОТ БЛОК - он дублирует кнопки */}
-    {/* 
-    <div className="absolute bottom-20 left-2 right-2 flex justify-center gap-2">
-      <button onClick={() => handleBuyUnit('melee')}>⚔️ Мечник 80💰</button>
-      <button onClick={() => handleBuyUnit('ranged')}>🏹 Лучник 100💰</button>
-      <button onClick={() => handleBuyUnit('tank')}>🛡️ Танк 120💰</button>
+    <div className="relative">
+      <canvas
+        ref={canvasRefCallback}
+        width={width}
+        height={height}
+        className="rounded-lg shadow-2xl border-2 border-white/20 cursor-crosshair"
+        style={{ touchAction: 'none', backgroundColor: '#1a3a1a' }}
+        onClick={handleCanvasClick}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseLeave={handleCanvasMouseLeave}
+      />
+      
+      {selectedUnitType && (
+        <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-yellow-600 text-white px-4 py-2 rounded-full text-sm font-bold animate-pulse whitespace-nowrap z-50">
+          🎯 Выбери место для юнита (нажми на свободный гекс)
+        </div>
+      )}
+      
+      <div className="absolute top-2 right-2 bg-black/70 rounded-lg px-3 py-1 text-xs">
+        <span className="text-gray-400">Юниты:</span>
+        <span className={`ml-1 font-bold ${engine?.units.length >= 15 ? 'text-orange-400' : 'text-green-400'}`}>
+          {engine?.units.length || 0}/{TOTAL_MAX_UNITS}
+        </span>
+      </div>
     </div>
-    */}
-    
-    <div className="absolute top-2 right-2 bg-black/70 rounded-lg px-3 py-1 text-xs">
-      <span className="text-gray-400">Юниты:</span>
-      <span className={`ml-1 font-bold ${engineRef.current?.units.length >= 18 ? 'text-orange-400' : 'text-green-400'}`}>
-        {engineRef.current?.units.length || 0}/20
-      </span>
-    </div>
-  </div>
-);
+  );
 });
 
 GameCanvas.displayName = 'GameCanvas';

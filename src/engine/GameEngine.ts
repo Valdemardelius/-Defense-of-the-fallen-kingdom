@@ -1,4 +1,6 @@
 import type { IUnit, IEnemy, UnitType } from '../types';
+import { UNIT_CONFIG, TOTAL_MAX_UNITS, getUnitStats } from '../config/units';
+import { HexGrid } from './HexGrid';
 
 export class GameEngine {
   private ctx: CanvasRenderingContext2D;
@@ -6,6 +8,7 @@ export class GameEngine {
   private height: number;
   private baseX: number;
   private baseY: number;
+  private hexGrid: HexGrid;
   
   public units: IUnit[] = [];
   public enemies: IEnemy[] = [];
@@ -29,95 +32,53 @@ export class GameEngine {
     this.height = height;
     this.baseX = width / 2;
     this.baseY = height / 2;
+    this.hexGrid = new HexGrid(this.baseX, this.baseY, 32);
     this.onBaseDamage = callbacks?.onBaseDamage;
     this.onEnemyKilled = callbacks?.onEnemyKilled;
   }
   
-  private isPositionOccupied(x: number, y: number, radius: number = 25): boolean {
-    for (const unit of this.units) {
-      const dx = unit.x - x;
-      const dy = unit.y - y;
-      const distance = Math.hypot(dx, dy);
-      if (distance < radius) {
-        return true;
-      }
-    }
-    return false;
-  }
-  
-  private findFreePositionAroundBase(): { x: number, y: number } | null {
-    const radius = 70;
-    const maxAttempts = 36;
+  public addUnitAtPosition(type: UnitType, x: number, y: number, damageBonus: number = 1, hpBonus: number = 1): { success: boolean; reason?: string } {
+    const maxCount = UNIT_CONFIG[type].maxCount;
+    const currentCount = this.units.filter(u => u.type === type).length;
     
-    for (let i = 0; i < maxAttempts; i++) {
-      const angle = (i / maxAttempts) * Math.PI * 2;
-      const x = this.baseX + Math.cos(angle) * radius;
-      const y = this.baseY + Math.sin(angle) * radius;
-      
-      if (!this.isPositionOccupied(x, y)) {
-        return { x, y };
-      }
+    if (this.units.length >= TOTAL_MAX_UNITS) {
+      return { success: false, reason: 'max_units' };
+    }
+    if (currentCount >= maxCount) {
+      return { success: false, reason: `max_type_${type}` };
     }
     
-    for (let r = radius + 20; r <= radius + 100; r += 20) {
-      for (let i = 0; i < maxAttempts; i++) {
-        const angle = (i / maxAttempts) * Math.PI * 2;
-        const x = this.baseX + Math.cos(angle) * r;
-        const y = this.baseY + Math.sin(angle) * r;
-        
-        if (!this.isPositionOccupied(x, y)) {
-          return { x, y };
-        }
-      }
+    const hexAtPos = this.hexGrid.getHexAtPixel(x, y);
+    if (!hexAtPos) {
+      return { success: false, reason: 'invalid_position' };
     }
     
-    return null;
-  }
-  
-  public addUnit(type: UnitType, x?: number, y?: number, damageBonus: number = 1, hpBonus: number = 1): { success: boolean; reason?: string } {
-  if (this.units.length >= 20) {
-    return { success: false, reason: 'max_units' };
-  }
-  
-  let spawnX = x;
-  let spawnY = y;
-  
-  if (!spawnX || !spawnY) {
-    const freePos = this.findFreePositionAroundBase();
-    if (!freePos) {
-      return { success: false, reason: 'no_space' };
+    const distanceToBase = Math.hypot(hexAtPos.x - this.baseX, hexAtPos.y - this.baseY);
+    if (distanceToBase < 40) {
+      return { success: false, reason: 'too_close_to_base' };
     }
-    spawnX = freePos.x;
-    spawnY = freePos.y;
+    
+    const stats = getUnitStats(type);
+    
+    this.units.push({
+      id: Math.random().toString(36).substr(2, 9),
+      x: hexAtPos.x,
+      y: hexAtPos.y,
+      type,
+      hp: stats.hp * hpBonus,
+      maxHp: stats.hp * hpBonus,
+      damage: stats.damage * damageBonus,
+      attackRange: stats.range,
+      attackCooldown: stats.attackCooldown,
+      lastAttack: 0,
+      hexQ: hexAtPos.q,
+      hexR: hexAtPos.r
+    });
+    
+    this.hexGrid.occupyHex(hexAtPos.q, hexAtPos.r);
+    
+    return { success: true };
   }
-  
-  if (this.isPositionOccupied(spawnX, spawnY)) {
-    return { success: false, reason: 'position_occupied' };
-  }
-  
-  const stats = {
-    melee: { hp: 100, damage: 20, range: 50, cooldown: 1.0 },
-    ranged: { hp: 70, damage: 35, range: 120, cooldown: 0.8 },
-    tank: { hp: 200, damage: 12, range: 40, cooldown: 0.7 }
-  };
-  
-  const s = stats[type];
-  
-  this.units.push({
-    id: Math.random().toString(36).substr(2, 9),
-    x: spawnX,
-    y: spawnY,
-    type,
-    hp: s.hp * hpBonus,
-    maxHp: s.hp * hpBonus,
-    damage: s.damage * damageBonus,
-    attackRange: s.range,
-    attackCooldown: s.cooldown,
-    lastAttack: 0
-  });
-  
-  return { success: true };
-}
   
   public addEnemy(enemy: IEnemy) {
     this.enemies.push(enemy);
@@ -132,8 +93,6 @@ export class GameEngine {
   }
   
   private updateEnemiesMovement(dt: number) {
-    const enemiesToRemove: IEnemy[] = [];
-    
     for (const enemy of this.enemies) {
       let targetX = this.baseX;
       let targetY = this.baseY;
@@ -152,9 +111,7 @@ export class GameEngine {
       const dy = targetY - enemy.y;
       const distance = Math.hypot(dx, dy);
       
-      if (distance < 15) {
-        continue;
-      }
+      if (distance < 15) continue;
       
       const moveDistance = enemy.speed * dt;
       const ratio = Math.min(1, moveDistance / distance);
@@ -179,7 +136,6 @@ export class GameEngine {
         const dx = enemy.x - tank.x;
         const dy = enemy.y - tank.y;
         const distance = Math.hypot(dx, dy);
-        
         if (distance < targetDistance) {
           targetDistance = distance;
           targetUnit = tank;
@@ -209,26 +165,19 @@ export class GameEngine {
           const dx = enemy.x - unit.x;
           const dy = enemy.y - unit.y;
           const distance = Math.hypot(dx, dy);
-          
           if (distance < closestDist) {
             closestDist = distance;
             closestUnit = unit;
           }
         }
-        
-        if (closestUnit) {
-          targetUnit = closestUnit;
-        }
+        if (closestUnit) targetUnit = closestUnit;
       }
       
       if (targetUnit && !attackedBase) {
         targetUnit.hp -= enemy.damage;
         enemy.targetUnitId = targetUnit.id;
         enemy.lastAttackTime = currentTime;
-        
-        if (targetUnit.hp <= 0) {
-          enemy.targetUnitId = undefined;
-        }
+        if (targetUnit.hp <= 0) enemy.targetUnitId = undefined;
       }
     }
   }
@@ -248,7 +197,6 @@ export class GameEngine {
         const dx = unit.x - enemy.x;
         const dy = unit.y - enemy.y;
         const distance = Math.hypot(dx, dy);
-        
         if (distance < targetDistance) {
           targetDistance = distance;
           targetEnemy = enemy;
@@ -261,7 +209,6 @@ export class GameEngine {
           const dx = unit.x - enemy.x;
           const dy = unit.y - enemy.y;
           const distance = Math.hypot(dx, dy);
-          
           if (distance < targetDistance) {
             targetDistance = distance;
             targetEnemy = enemy;
@@ -272,12 +219,10 @@ export class GameEngine {
       if (!targetEnemy) {
         let closestEnemy: IEnemy | null = null;
         let closestDist = unit.attackRange;
-        
         for (const enemy of this.enemies) {
           const dx = unit.x - enemy.x;
           const dy = unit.y - enemy.y;
           const distance = Math.hypot(dx, dy);
-          
           if (distance < closestDist) {
             closestDist = distance;
             closestEnemy = enemy;
@@ -289,7 +234,6 @@ export class GameEngine {
       if (targetEnemy && currentTime - unit.lastAttack >= unit.attackCooldown) {
         targetEnemy.hp -= unit.damage;
         unit.lastAttack = currentTime;
-        
         if (targetEnemy.hp <= 0) {
           enemiesToRemove.push(targetEnemy);
           this.onEnemyKilled?.(targetEnemy.reward);
@@ -299,79 +243,62 @@ export class GameEngine {
     
     for (const enemy of enemiesToRemove) {
       const index = this.enemies.indexOf(enemy);
-      if (index !== -1) {
-        this.enemies.splice(index, 1);
-      }
+      if (index !== -1) this.enemies.splice(index, 1);
     }
   }
   
   private removeDeadEntities() {
+    const deadUnits = this.units.filter(unit => unit.hp <= 0);
+    for (const unit of deadUnits) {
+      if (unit.hexQ !== undefined && unit.hexR !== undefined) {
+        this.hexGrid.freeHex(unit.hexQ, unit.hexR);
+      }
+    }
     this.units = this.units.filter(unit => unit.hp > 0);
   }
   
   public draw() {
     this.ctx.clearRect(0, 0, this.width, this.height);
-    this.ctx.fillStyle = '#2c5a2c';
+    this.ctx.fillStyle = '#1a3a1a';
     this.ctx.fillRect(0, 0, this.width, this.height);
-    
-    this.drawGrid();
+    this.hexGrid.draw(this.ctx);
     this.drawBase();
     this.drawUnits();
     this.drawEnemies();
   }
   
-  private drawGrid() {
-    this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    this.ctx.lineWidth = 1;
-    
-    for (let x = 0; x < this.width; x += 50) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, 0);
-      this.ctx.lineTo(x, this.height);
-      this.ctx.stroke();
-    }
-    
-    for (let y = 0; y < this.height; y += 50) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y);
-      this.ctx.lineTo(this.width, y);
-      this.ctx.stroke();
-    }
-  }
-  
   private drawBase() {
     this.ctx.fillStyle = '#8B5A2B';
-    this.ctx.fillRect(this.baseX - 25, this.baseY - 25, 50, 50);
+    this.ctx.beginPath();
+    this.ctx.arc(this.baseX, this.baseY, 30, 0, Math.PI * 2);
+    this.ctx.fill();
     
     const hpPercent = this.baseHp / this.baseMaxHp;
     this.ctx.fillStyle = '#ff0000';
-    this.ctx.fillRect(this.baseX - 35, this.baseY - 35, 70, 6);
+    this.ctx.fillRect(this.baseX - 35, this.baseY - 45, 70, 6);
     this.ctx.fillStyle = '#00ff00';
-    this.ctx.fillRect(this.baseX - 35, this.baseY - 35, 70 * hpPercent, 6);
+    this.ctx.fillRect(this.baseX - 35, this.baseY - 45, 70 * hpPercent, 6);
     
     this.ctx.fillStyle = 'white';
-    this.ctx.font = '12px Arial';
-    this.ctx.fillText(`БАЗА ${Math.floor(this.baseHp)}/${this.baseMaxHp}`, this.baseX - 30, this.baseY - 40);
+    this.ctx.font = 'bold 12px Arial';
+    this.ctx.fillText(`БАЗА ${Math.floor(this.baseHp)}/${this.baseMaxHp}`, this.baseX - 30, this.baseY - 48);
   }
   
   private drawUnits() {
+    const colors = { melee: '#4169E1', ranged: '#32CD32', tank: '#CD7F32' };
+    const icons = { melee: '⚔️', ranged: '🏹', tank: '🛡️' };
+    
     for (const unit of this.units) {
-      const colors = {
-        melee: '#4169E1',
-        ranged: '#32CD32',
-        tank: '#8B4513'
-      };
-      
       this.ctx.fillStyle = colors[unit.type];
       this.ctx.beginPath();
-      this.ctx.arc(unit.x, unit.y, 12, 0, Math.PI * 2);
+      this.ctx.arc(unit.x, unit.y, 14, 0, Math.PI * 2);
       this.ctx.fill();
       
       if (unit.type === 'tank') {
         this.ctx.strokeStyle = '#FFD700';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.arc(unit.x, unit.y, 14, 0, Math.PI * 2);
+        this.ctx.arc(unit.x, unit.y, 16, 0, Math.PI * 2);
         this.ctx.stroke();
       }
       
@@ -381,20 +308,13 @@ export class GameEngine {
       
       const hpPercent = unit.hp / unit.maxHp;
       this.ctx.fillStyle = 'red';
-      this.ctx.fillRect(unit.x - 12, unit.y - 18, 24, 3);
+      this.ctx.fillRect(unit.x - 12, unit.y - 20, 24, 3);
       this.ctx.fillStyle = 'lime';
-      this.ctx.fillRect(unit.x - 12, unit.y - 18, 24 * hpPercent, 3);
+      this.ctx.fillRect(unit.x - 12, unit.y - 20, 24 * hpPercent, 3);
       
       this.ctx.fillStyle = 'white';
-      this.ctx.font = '12px Arial';
-      const icons = { melee: '⚔️', ranged: '🏹', tank: '🛡️' };
-      this.ctx.fillText(icons[unit.type], unit.x - 6, unit.y + 5);
-      
-      if (unit.type === 'tank') {
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.font = '10px Arial';
-        this.ctx.fillText(`${Math.floor(unit.hp)}`, unit.x - 8, unit.y - 20);
-      }
+      this.ctx.font = 'bold 14px Arial';
+      this.ctx.fillText(icons[unit.type], unit.x - 8, unit.y + 5);
     }
   }
   
@@ -409,35 +329,55 @@ export class GameEngine {
       }
       
       this.ctx.beginPath();
-      this.ctx.arc(enemy.x, enemy.y, 10, 0, Math.PI * 2);
+      this.ctx.arc(enemy.x, enemy.y, 12, 0, Math.PI * 2);
       this.ctx.fill();
       
       if (enemy.isTank) {
         this.ctx.strokeStyle = '#FFD700';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.arc(enemy.x, enemy.y, 13, 0, Math.PI * 2);
+        this.ctx.arc(enemy.x, enemy.y, 14, 0, Math.PI * 2);
         this.ctx.stroke();
         this.ctx.fillStyle = '#FFD700';
         this.ctx.font = '12px Arial';
-        this.ctx.fillText('🛡️', enemy.x - 6, enemy.y - 12);
+        this.ctx.fillText('🛡️', enemy.x - 6, enemy.y - 14);
       }
       
       if (enemy.isBoss) {
         this.ctx.fillStyle = '#FF0000';
-        this.ctx.font = '16px Arial';
-        this.ctx.fillText('👑', enemy.x - 8, enemy.y - 15);
+        this.ctx.font = '18px Arial';
+        this.ctx.fillText('👑', enemy.x - 10, enemy.y - 18);
       }
       
       const hpPercent = enemy.hp / enemy.maxHp;
       this.ctx.fillStyle = 'red';
-      this.ctx.fillRect(enemy.x - 12, enemy.y - 15, 24, 3);
+      this.ctx.fillRect(enemy.x - 15, enemy.y - 18, 30, 4);
       this.ctx.fillStyle = 'lime';
-      this.ctx.fillRect(enemy.x - 12, enemy.y - 15, 24 * hpPercent, 3);
-      
-      this.ctx.fillStyle = 'white';
-      this.ctx.font = '10px Arial';
-      this.ctx.fillText(`${enemy.damage}💥`, enemy.x - 8, enemy.y - 22);
+      this.ctx.fillRect(enemy.x - 15, enemy.y - 18, 30 * hpPercent, 4);
     }
+  }
+  
+  public getHexAtPixel(x: number, y: number): { q: number; r: number; x: number; y: number } | null {
+  const result = this.hexGrid.getHexAtPixel(x, y);
+  return result;
+}
+  
+  public drawHighlight(q: number, r: number): void {
+  if (!this.ctx) {
+    return;
+  }
+  this.hexGrid.drawHighlight(this.ctx, q, r);
+}
+  
+  public getFreeHexInOrder(): { x: number; y: number; q: number; r: number } | null {
+    return this.hexGrid.getFreeHexInOrder();
+  }
+  
+  public occupyHex(q: number, r: number): void {
+    this.hexGrid.occupyHex(q, r);
+  }
+  
+  public freeHex(q: number, r: number): void {
+    this.hexGrid.freeHex(q, r);
   }
 }

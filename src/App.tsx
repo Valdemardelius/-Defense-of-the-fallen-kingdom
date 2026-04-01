@@ -1,24 +1,26 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { InfoPanel } from './components/UI/InfoPanel';
 import { BuildMenu } from './components/UI/BuildMenu';
 import { TechTree } from './components/UI/TechTree';
 import { useGameStore } from './store/gameStore';
+import { type UnitType } from './config/units';
 
 function App() {
-  const { baseHp } = useGameStore();
-  const [unitCount, setUnitCount] = useState(0);
+  const { baseHp, unitCounts, setUnitCounts } = useGameStore();
+  const [totalUnits, setTotalUnits] = useState(0);
   const canvasRef = useRef<any>(null);
 
-  const handleUnitCountChange = (count: number) => {
-    setUnitCount(count);
-  };
+  const handleUnitCountChange = useCallback((count: number, countsByType: Record<UnitType, number>) => {
+    setTotalUnits(count);
+    setUnitCounts(countsByType);
+  }, [setUnitCounts]);
 
-  const handleBuyUnit = (type: 'melee' | 'ranged' | 'tank') => {
+  const handleBuyUnit = useCallback((type: UnitType, x?: number, y?: number) => {
     if (canvasRef.current?.buyUnit) {
-      canvasRef.current.buyUnit(type);
+      canvasRef.current.buyUnit(type, x, y);
     }
-  };
+  }, []);
 
   if (baseHp <= 0) {
     return (
@@ -54,12 +56,12 @@ function App() {
       
       <BuildMenu 
         onBuyUnit={handleBuyUnit}
-        currentUnitCount={unitCount}
-        maxUnits={20}
+        currentUnitCount={totalUnits}
+        canvasRef={canvasRef}
       />
       
       <div className="fixed bottom-2 left-0 right-0 text-center text-gray-500 text-xs">
-        🎮 Танки (золотая обводка) в приоритете у врагов | Максимум 20 юнитов
+        🎮 Гексагональное поле | Танки в приоритете у врагов | Максимум 18 юнитов
       </div>
     </div>
   );
