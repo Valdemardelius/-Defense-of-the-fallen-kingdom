@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { GameEngine } from '../../engine/GameEngine';
 import { UnitManager } from '../../engine/UnitManager';
-import { type UnitType } from '../../config/units';
+import { type UnitType } from '../../engine/config/units';
 
 interface UseGameLoopProps {
   canvas: HTMLCanvasElement | null;

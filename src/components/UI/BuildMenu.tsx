@@ -1,11 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { getAllUnits, TOTAL_MAX_UNITS, type UnitType } from '../../config/units';
+import { getAllUnits, TOTAL_MAX_UNITS, type UnitType } from '../../engine/config/units';
 
 interface BuildMenuProps {
   onBuyUnit: (type: UnitType, x?: number, y?: number) => void;
   currentUnitCount: number;
-  canvasRef?: React.MutableRefObject<any>;
+  canvasRef?: React.MutableRefObject<HTMLCanvasElement>; // TODO  коля насрал
 }
 
 export const BuildMenu: React.FC<BuildMenuProps> = ({ 

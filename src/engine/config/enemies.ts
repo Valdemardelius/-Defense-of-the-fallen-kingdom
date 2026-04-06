@@ -1,13 +1,3 @@
-export interface EnemyStats {
-  baseHp: number;
-  baseDamage: number;
-  baseReward: number;
-  baseSpeed: number;
-  name: string;
-  icon: string;
-  color: string;
-}
-
 export const ENEMY_TYPES = {
   normal: {
     baseHp: 30,
@@ -39,6 +29,14 @@ export const ENEMY_TYPES = {
 } as const;
 
 export type EnemyType = keyof typeof ENEMY_TYPES;
+
+export const getEnemyColor = (type: EnemyType): string => {
+  return ENEMY_TYPES[type].color;
+};
+
+export const getEnemyIcon = (type: EnemyType): string => {
+  return ENEMY_TYPES[type].icon;
+};
 
 export interface IEnemyConfig {
   type: EnemyType;
@@ -75,15 +73,4 @@ export const createEnemy = (
     isBoss: type === 'boss',
     isTank: type === 'tank'
   };
-};
-
-export const getEnemyStats = (type: EnemyType): EnemyStats => {
-  return ENEMY_TYPES[type];
-};
-
-export const getAllEnemyTypes = () => {
-  return Object.entries(ENEMY_TYPES).map(([type, stats]) => ({
-    type: type as EnemyType,
-    ...stats
-  }));
 };

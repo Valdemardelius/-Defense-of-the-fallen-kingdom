@@ -1,4 +1,4 @@
-import type { UnitType } from '../config/units';
+import type { UnitType } from '../engine/config/units';
 
 export type { UnitType };
 

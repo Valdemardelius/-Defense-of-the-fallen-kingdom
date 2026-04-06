@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { GameEngine } from '../../engine/GameEngine';
 import { UnitManager } from '../../engine/UnitManager';
-import { getUnitCost, TOTAL_MAX_UNITS, UNIT_CONFIG, type UnitType } from '../../config/units';
+import { getUnitCost, TOTAL_MAX_UNITS, UNIT_CONFIG, type UnitType } from '../../engine/config/units';
 import { useGameStore } from '../../store/gameStore';
 
 export const useUnitManager = (engine: GameEngine | null, onUnitCountChange?: (count: number, countsByType: Record<UnitType, number>) => void) => {

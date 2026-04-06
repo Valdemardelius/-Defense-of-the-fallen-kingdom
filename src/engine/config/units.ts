@@ -8,6 +8,7 @@ export interface UnitStats {
   name: string;
   icon: string;
   color: string;
+  bgColor: string;
   description: string;
 }
 
@@ -21,7 +22,8 @@ export const UNIT_CONFIG = {
     maxCount: 8,
     name: 'Мечник',
     icon: '⚔️',
-    color: 'bg-blue-600',
+    color: '#4169E1',
+    bgColor: 'bg-blue-600',
     description: 'Ближний бой, средний урон'
   },
   ranged: {
@@ -33,7 +35,8 @@ export const UNIT_CONFIG = {
     maxCount: 6,
     name: 'Лучник',
     icon: '🏹',
-    color: 'bg-green-600',
+    color: '#32CD32',
+    bgColor: 'bg-green-600',
     description: 'Дальний бой, высокий урон'
   },
   tank: {
@@ -45,7 +48,8 @@ export const UNIT_CONFIG = {
     maxCount: 4,
     name: 'Танк',
     icon: '🛡️',
-    color: 'bg-amber-700',
+    color: '#CD7F32',
+    bgColor: 'bg-amber-700',
     description: 'Много HP, низкий урон'
   }
 } as const;

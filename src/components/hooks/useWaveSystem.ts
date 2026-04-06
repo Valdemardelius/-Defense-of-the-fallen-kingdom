@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { GameEngine } from '../../engine/GameEngine';
-import { createEnemy, type EnemyType } from '../../config/enemies';
+import { createEnemy, type EnemyType } from '../../engine/config/enemies';
 
 interface UseWaveSystemProps {
   engine: GameEngine | null;
@@ -55,20 +55,13 @@ export const useWaveSystem = ({ engine, width, height, onWaveStart }: UseWaveSys
       const enemyType = getEnemyType(wave.count, wave.enemiesSpawned);
       const enemyConfig = createEnemy(enemyType, wave.count);
       
-      engine.addEnemy({
-        id: `enemy_${Date.now()}_${wave.enemiesSpawned}`,
-        x, y,
-        hp: enemyConfig.hp,
-        maxHp: enemyConfig.hp,
-        damage: enemyConfig.damage,
-        reward: enemyConfig.reward,
-        speed: enemyConfig.speed,
-        isBoss: enemyConfig.isBoss,
-        isTank: enemyConfig.isTank,
-        attackRange: 45,
-        attackCooldown: 1.0,
-        lastAttackTime: 0
-      });
+      engine.addEnemy(
+        enemyConfig.type,
+        x,
+        y,
+        wave.count,
+        undefined
+      );
       
       wave.enemiesSpawned++;
     };

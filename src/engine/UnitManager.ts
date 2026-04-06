@@ -1,5 +1,7 @@
 import { GameEngine } from './GameEngine';
-import { UNIT_CONFIG, TOTAL_MAX_UNITS, getUnitCost, getUnitStats, type UnitType } from '../config/units';
+import { Unit } from './entities';
+import { UNIT_CONFIG, TOTAL_MAX_UNITS, type UnitType } from './config/units';
+import { canAddUnit } from './utils';
 
 export class UnitManager {
   private engine: GameEngine;
@@ -9,28 +11,13 @@ export class UnitManager {
   }
   
   public canAddUnit(type: UnitType): boolean {
-    if (this.engine.units.length >= TOTAL_MAX_UNITS) {
-      return false;
-    }
-    
-    const maxCount = UNIT_CONFIG[type].maxCount;
-    const currentCount = this.getUnitCountByType(type);
-    
-    return currentCount < maxCount;
-  }
-  
-  public getUnitCountByType(type: UnitType): number {
-    return this.engine.units.filter(u => u.type === type).length;
+    return canAddUnit(this.engine.units, type).canAdd;
   }
   
   public addUnitAuto(type: UnitType, damageBonus: number = 1, hpBonus: number = 1): { success: boolean; reason?: string } {
-    if (!this.canAddUnit(type)) {
-      const maxCount = UNIT_CONFIG[type].maxCount;
-      const currentCount = this.getUnitCountByType(type);
-      if (currentCount >= maxCount) {
-        return { success: false, reason: `max_type_${type}` };
-      }
-      return { success: false, reason: 'max_units' };
+    const canAdd = canAddUnit(this.engine.units, type);
+    if (!canAdd.canAdd) {
+      return { success: false, reason: canAdd.reason };
     }
     
     const freePos = this.engine.getFreeHexInOrder();
@@ -38,68 +25,15 @@ export class UnitManager {
       return { success: false, reason: 'no_space' };
     }
     
-    const stats = getUnitStats(type);
-    
-    this.engine.units.push({
-      id: Math.random().toString(36).substr(2, 9),
-      x: freePos.x,
-      y: freePos.y,
-      type,
-      hp: stats.hp * hpBonus,
-      maxHp: stats.hp * hpBonus,
-      damage: stats.damage * damageBonus,
-      attackRange: stats.range,
-      attackCooldown: stats.attackCooldown,
-      lastAttack: 0,
-      hexQ: freePos.q,
-      hexR: freePos.r
-    });
-    
+    const unit = new Unit(type, freePos.x, freePos.y, damageBonus, hpBonus, freePos.q, freePos.r);
+    this.engine.units.push(unit);
     this.engine.occupyHex(freePos.q, freePos.r);
     
     return { success: true };
   }
   
   public addUnitAtPosition(type: UnitType, x: number, y: number, damageBonus: number = 1, hpBonus: number = 1): { success: boolean; reason?: string } {
-    if (!this.canAddUnit(type)) {
-      const maxCount = UNIT_CONFIG[type].maxCount;
-      const currentCount = this.getUnitCountByType(type);
-      if (currentCount >= maxCount) {
-        return { success: false, reason: `max_type_${type}` };
-      }
-      return { success: false, reason: 'max_units' };
-    }
-    
-    const hexAtPos = this.engine.getHexAtPixel(x, y);
-    if (!hexAtPos) {
-      return { success: false, reason: 'invalid_position' };
-    }
-    
-    const distanceToBase = Math.hypot(hexAtPos.x - this.engine.baseX, hexAtPos.y - this.engine.baseY);
-    if (distanceToBase < 40) {
-      return { success: false, reason: 'too_close_to_base' };
-    }
-    
-    const stats = getUnitStats(type);
-    
-    this.engine.units.push({
-      id: Math.random().toString(36).substr(2, 9),
-      x: hexAtPos.x,
-      y: hexAtPos.y,
-      type,
-      hp: stats.hp * hpBonus,
-      maxHp: stats.hp * hpBonus,
-      damage: stats.damage * damageBonus,
-      attackRange: stats.range,
-      attackCooldown: stats.attackCooldown,
-      lastAttack: 0,
-      hexQ: hexAtPos.q,
-      hexR: hexAtPos.r
-    });
-    
-    this.engine.occupyHex(hexAtPos.q, hexAtPos.r);
-    
-    return { success: true };
+    return this.engine.addUnitAtPosition(type, x, y, damageBonus, hpBonus);
   }
   
   public removeUnit(unitId: string): void {

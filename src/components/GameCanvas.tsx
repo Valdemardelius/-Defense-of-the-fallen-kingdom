@@ -1,9 +1,13 @@
-import React, { useRef, forwardRef, useImperativeHandle, useCallback, useState, useEffect } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle, useCallback, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { TOTAL_MAX_UNITS, type UnitType } from '../config/units';
+import { TOTAL_MAX_UNITS, type UnitType } from '../engine/config/units';
+import { Tooltip } from './UI/Tooltip';
 import { useGameLoop } from './hooks/useGameLoop';
 import { useWaveSystem } from './hooks/useWaveSystem';
 import { useUnitManager } from './hooks/useUnitManager';
+import { useTooltip } from './hooks/useTooltip';
+import { useHoverHex } from './hooks/useHoverHex';
+import { useHighlight } from './hooks/useHighlight';
 
 interface GameCanvasProps {
   width?: number;
@@ -18,7 +22,6 @@ export const GameCanvas = forwardRef<any, GameCanvasProps>(({
 }, ref) => {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [selectedUnitType, setSelectedUnitType] = useState<UnitType | null>(null);
-  const [hoverHex, setHoverHex] = useState<{ q: number; r: number; x: number; y: number } | null>(null);
   const { addResources, damageBase, setWave } = useGameStore();
   
   const canvasRefCallback = useCallback((node: HTMLCanvasElement | null) => {
@@ -42,6 +45,10 @@ export const GameCanvas = forwardRef<any, GameCanvasProps>(({
   });
   
   const { buyUnitAuto, buyUnitAtPosition } = useUnitManager(engine, onUnitCountChange);
+  
+  const { tooltip, updateTooltip, hideTooltip } = useTooltip(engine);
+  const { hoverHex, updateHoverHex, clearHoverHex } = useHoverHex(engine);
+  useHighlight(engine, hoverHex, selectedUnitType);
   
   useImperativeHandle(ref, () => ({
     buyUnit: (type: UnitType, x?: number, y?: number) => {
@@ -84,29 +91,14 @@ export const GameCanvas = forwardRef<any, GameCanvasProps>(({
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
     
-    const hexAtPos = engine.getHexAtPixel(mouseX, mouseY);
-    setHoverHex(hexAtPos);
-  };
-
-  const handleCanvasMouseLeave = () => {
-    setHoverHex(null);
+    updateHoverHex(mouseX, mouseY);
+    updateTooltip(mouseX, mouseY, e.clientX, e.clientY);
   };
   
-  useEffect(() => {
-    if (!engine || !hoverHex || !selectedUnitType) return;
-    
-    let frameId: number;
-    
-    const drawHighlight = () => {
-      if (engine && hoverHex) {
-        engine.drawHighlight(hoverHex.q, hoverHex.r);
-      }
-      frameId = requestAnimationFrame(drawHighlight);
-    };
-    
-    frameId = requestAnimationFrame(drawHighlight);
-    return () => cancelAnimationFrame(frameId);
-  }, [engine, hoverHex, selectedUnitType]);
+  const handleCanvasMouseLeave = () => {
+    clearHoverHex();
+    hideTooltip();
+  };
 
   return (
     <div className="relative">
@@ -119,6 +111,14 @@ export const GameCanvas = forwardRef<any, GameCanvasProps>(({
         onClick={handleCanvasClick}
         onMouseMove={handleCanvasMouseMove}
         onMouseLeave={handleCanvasMouseLeave}
+      />
+      
+      <Tooltip
+        x={tooltip.x}
+        y={tooltip.y}
+        title={tooltip.title}
+        stats={tooltip.stats}
+        visible={tooltip.visible}
       />
       
       {selectedUnitType && (

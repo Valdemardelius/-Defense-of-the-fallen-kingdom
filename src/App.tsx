@@ -4,7 +4,7 @@ import { InfoPanel } from './components/UI/InfoPanel';
 import { BuildMenu } from './components/UI/BuildMenu';
 import { TechTree } from './components/UI/TechTree';
 import { useGameStore } from './store/gameStore';
-import { type UnitType } from './config/units';
+import { type UnitType } from './engine/config/units';
 
 function App() {
   const { baseHp, unitCounts, setUnitCounts } = useGameStore();

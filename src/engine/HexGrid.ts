@@ -44,18 +44,13 @@ export class HexGrid {
   }
   
   public getHexAtPixel(x: number, y: number): { x: number; y: number; q: number; r: number } | null {
-  console.log('HexGrid.getHexAtPixel', x, y); // Отладка
   const { q, r } = this.pixelToHex(x, y);
-  console.log('converted to hex', q, r); // Отладка
   const key = this.getHexKey(q, r);
-  console.log('key', key, 'blocked:', this.blockedHexes.has(key), 'occupied:', this.occupiedHexes.has(key)); // Отладка
   
   if (!this.blockedHexes.has(key) && !this.occupiedHexes.has(key)) {
     const pixel = this.hexToPixel(q, r);
-    console.log('returning pixel', pixel); // Отладка
     return { x: pixel.x, y: pixel.y, q, r };
   }
-  console.log('hex is blocked or occupied'); // Отладка
   return null;
 }
   

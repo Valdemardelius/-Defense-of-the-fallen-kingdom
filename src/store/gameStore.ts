@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { type UnitType } from '../config/units';
+import { type UnitType } from '../engine/config/units';
 
 interface Upgrade {
   level: number;
