@@ -1,49 +1,33 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { InfoPanel } from './components/UI/InfoPanel';
 import { BuildMenu } from './components/UI/BuildMenu';
 import { TechTree } from './components/UI/TechTree';
+import { SaveMenu } from './components/UI/save';
+import { LoadingScreen } from './components/LoadingScreen';
+import { GameOverScreen } from './components/GameOverScreen';
 import { useGameStore } from './store/gameStore';
-import { type UnitType } from './engine/config/units';
+import { useGameInit } from './components/hooks/useGameInit';
+import { useUnitManagement } from './components/hooks/useUnitManagement';
 
 function App() {
-  const { baseHp, unitCounts, setUnitCounts } = useGameStore();
-  const [totalUnits, setTotalUnits] = useState(0);
   const canvasRef = useRef<any>(null);
+  const { baseHp } = useGameStore();
+  const { isLoading, totalUnits, setTotalUnits } = useGameInit();
+  const { handleUnitCountChange, handleBuyUnit } = useUnitManagement();
 
-  const handleUnitCountChange = useCallback((count: number, countsByType: Record<UnitType, number>) => {
-    setTotalUnits(count);
-    setUnitCounts(countsByType);
-  }, [setUnitCounts]);
+  const onBuyUnit = (type: any, x?: number, y?: number) => {
+    handleBuyUnit(canvasRef, type, x, y);
+  };
 
-  const handleBuyUnit = useCallback((type: UnitType, x?: number, y?: number) => {
-    if (canvasRef.current?.buyUnit) {
-      canvasRef.current.buyUnit(type, x, y);
-    }
-  }, []);
-
-  if (baseHp <= 0) {
-    return (
-      <div className="min-h-screen bg-game-dark flex items-center justify-center">
-        <div className="bg-black/80 text-white p-8 rounded-xl text-center">
-          <div className="text-6xl mb-4">💀</div>
-          <h1 className="text-3xl font-bold mb-2">ИГРА ОКОНЧЕНА</h1>
-          <p className="text-gray-400 mb-4">База разрушена...</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-green-600 px-6 py-2 rounded-lg hover:bg-green-500 transition"
-          >
-            Начать заново
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingScreen />;
+  if (baseHp <= 0) return <GameOverScreen />;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-game-dark to-game-light flex flex-col items-center justify-center p-2">
       <InfoPanel />
       <TechTree />
+      <SaveMenu />
       
       <div className="mt-16 mb-32">
         <GameCanvas 
@@ -55,7 +39,7 @@ function App() {
       </div>
       
       <BuildMenu 
-        onBuyUnit={handleBuyUnit}
+        onBuyUnit={onBuyUnit}
         currentUnitCount={totalUnits}
         canvasRef={canvasRef}
       />

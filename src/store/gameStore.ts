@@ -12,6 +12,7 @@ interface GameState {
   baseHp: number;
   wave: number;
   unitCounts: Record<UnitType, number>;
+  unitsPositions: Array<{ type: UnitType; hexQ: number; hexR: number }>;
   unitDamageUpgrade: Upgrade;
   unitHpUpgrade: Upgrade;
   resourceGainUpgrade: Upgrade;
@@ -20,23 +21,30 @@ interface GameState {
   damageBase: (damage: number) => void;
   setWave: (wave: number) => void;
   setUnitCounts: (counts: Record<UnitType, number>) => void;
+  setUnitsPositions: (positions: Array<{ type: UnitType; hexQ: number; hexR: number }>) => void;
   upgradeUnitDamage: () => boolean;
   upgradeUnitHp: () => boolean;
   upgradeResourceGain: () => boolean;
   getUnitDamageBonus: () => number;
   getUnitHpBonus: () => number;
   getResourceGainBonus: () => number;
+  loadFromSave: (saveData: any) => void;
+  resetGame: () => void;
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
+const initialState = {
   resources: 200,
   baseHp: 1000,
   wave: 1,
   unitCounts: { melee: 0, ranged: 0, tank: 0 },
-  
+  unitsPositions: [],
   unitDamageUpgrade: { level: 0, cost: 100, effect: 1.0 },
   unitHpUpgrade: { level: 0, cost: 80, effect: 1.0 },
-  resourceGainUpgrade: { level: 0, cost: 120, effect: 1.0 },
+  resourceGainUpgrade: { level: 0, cost: 120, effect: 1.0 }
+};
+
+export const useGameStore = create<GameState>((set, get) => ({
+  ...initialState,
   
   addResources: (amount: number) => {
     const bonus = get().getResourceGainBonus();
@@ -62,6 +70,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   setUnitCounts: (counts: Record<UnitType, number>) => {
     set({ unitCounts: counts });
+  },
+  
+  setUnitsPositions: (positions) => {
+    set({ unitsPositions: positions });
   },
   
   upgradeUnitDamage: () => {
@@ -125,5 +137,22 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   getResourceGainBonus: () => {
     return get().resourceGainUpgrade.effect;
+  },
+  
+  loadFromSave: (saveData) => {
+    set({
+      resources: saveData.resources,
+    baseHp: saveData.baseHp,
+    wave: saveData.wave,
+    unitCounts: saveData.unitCounts,
+    unitsPositions: saveData.units || [],
+    unitDamageUpgrade: saveData.upgrades.damage,
+    unitHpUpgrade: saveData.upgrades.hp,
+    resourceGainUpgrade: saveData.upgrades.resource
+    });
+  },
+  
+  resetGame: () => {
+    set(initialState);
   }
 }));
